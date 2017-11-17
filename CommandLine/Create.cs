@@ -2,7 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace Microsoft.DotNet.Cli.CommandLine
 {
@@ -11,11 +13,18 @@ namespace Microsoft.DotNet.Cli.CommandLine
         public static Option Option(
             string aliases,
             string help,
-            ArgumentsRule arguments = null,
-            Func<AppliedOption, object> materialize = null) =>
+            ArgumentsRule arguments = null) =>
             new Option(
                 aliases.Split(
                     new[] { '|', ' ' }, StringSplitOptions.RemoveEmptyEntries), help, arguments);
+
+      [Obsolete("Do not use this overload. It will be removed. materialize argument is unused.", error: true)]
+      public static Option Option(
+            string aliases,
+            string help,
+            ArgumentsRule arguments,
+            Func<AppliedOption, object> materialize) =>
+            Option(aliases, help, arguments);
 
         public static Command Command(
             string name,
@@ -55,5 +64,11 @@ namespace Microsoft.DotNet.Cli.CommandLine
             string help,
             params Command[] commands) =>
             new Command(name, help, commands);
+
+        private static readonly Lazy<string> executableName =
+            new Lazy<string>(() => Path.GetFileNameWithoutExtension(Assembly.GetEntryAssembly().Location));
+
+        public static Command RootCommand(params Option[] options) =>
+            Command(executableName.Value, "", Accept.NoArguments(), options);
     }
 }

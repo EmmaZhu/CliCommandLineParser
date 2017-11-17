@@ -131,7 +131,7 @@ namespace Microsoft.DotNet.Cli.CommandLine.Tests
                   .Which
                   .Message
                   .Should()
-                  .Be("Alias 'one' is already in use.");
+                  .Be("Alias '--one' is already in use.");
         }
 
         [Fact]
@@ -139,7 +139,7 @@ namespace Microsoft.DotNet.Cli.CommandLine.Tests
         {
             var result = new Parser(
                     Option("-o|--one", ""))
-                .Parse("-o \"some stuff\" -- -x -y -z");
+                .Parse("-o \"some stuff\" -- -x -y -z -o:foo");
 
             result.HasOption("o")
                   .Should()
@@ -148,6 +148,10 @@ namespace Microsoft.DotNet.Cli.CommandLine.Tests
             result.AppliedOptions
                   .Should()
                   .HaveCount(1);
+
+            result.UnparsedTokens
+                  .Should()
+                  .HaveCount(4);
         }
 
         [Fact]
@@ -254,10 +258,10 @@ namespace Microsoft.DotNet.Cli.CommandLine.Tests
         public void Options_short_forms_do_not_get_unbundled_if_unbundling_is_turned_off()
         {
             Command command = Command("the-command", "",
-                        Option("-x", "", NoArguments()),
-                        Option("-y", "", NoArguments()),
-                        Option("-z", "", NoArguments()),
-                        Option("-xyz", "", NoArguments()));
+                                      Option("-x", "", NoArguments()),
+                                      Option("-y", "", NoArguments()),
+                                      Option("-z", "", NoArguments()),
+                                      Option("-xyz", "", NoArguments()));
             ParserConfiguration parseConfig = new ParserConfiguration(new Option[] { command }, allowUnbundling: false);
             var parser = new Parser(parseConfig);
             var result = parser.Parse("the-command -xyz");
@@ -605,6 +609,30 @@ namespace Microsoft.DotNet.Cli.CommandLine.Tests
         }
 
         [Fact]
+        public void Arguments_only_apply_to_the_nearest_command()
+        {
+            var command = Command("outer", "",
+                                  ExactlyOneArgument(),
+                                  Command("inner", "",
+                                          ExactlyOneArgument()));
+
+            var result = command.Parse("outer inner arg1 arg2");
+
+            result["outer"]
+                .Arguments
+                .Should()
+                .BeEmpty();
+
+            result["outer"]["inner"]
+                .Arguments
+                .Should()
+                .BeEquivalentTo("arg1");
+            result.UnmatchedTokens
+                  .Should()
+                  .BeEquivalentTo("arg2");
+        }
+
+        [Fact]
         public void Subsequent_occurrences_of_tokens_matching_command_names_are_parsed_as_arguments()
         {
             var command = Command("the-command", "",
@@ -760,6 +788,52 @@ namespace Microsoft.DotNet.Cli.CommandLine.Tests
                 .Arguments
                 .Should()
                 .BeEquivalentTo("one");
+        }
+
+        [Fact]
+        public void Option_and_Command_can_have_the_same_alias()
+        {
+            var parser = new Parser(
+                Command("outer", "",
+                        ZeroOrMoreArguments(),
+                        Command("inner", "",
+                                ZeroOrMoreArguments()),
+                        Option("--inner", "")));
+
+            parser.Parse("outer inner")
+                  .AppliedCommand()
+                  .Name
+                  .Should()
+                  .Be("inner");
+
+            parser.Parse("outer --inner")
+                  .AppliedCommand()
+                  .Name
+                  .Should()
+                  .Be("outer");
+
+            parser.Parse("outer --inner inner")
+                  .AppliedCommand()
+                  .Name
+                  .Should()
+                  .Be("inner");
+
+            parser.Parse("outer --inner inner")["outer"]
+                  .AppliedOptions
+                  .Should()
+                  .Contain(o => o.Name == "inner");
+        }
+
+        [Fact]
+        public void Empty_string_can_be_accepted_as_a_command_line_argument_when_enclosed_in_double_quotes()
+        {
+            var parseResult = new Parser(
+                Option("-x",
+                       "",
+                       ZeroOrMoreArguments())).Parse("-x \"\"");
+
+            parseResult["x"].Arguments
+                            .ShouldBeEquivalentTo(new[] { "" });
         }
     }
 }

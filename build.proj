@@ -7,6 +7,7 @@
 
   <Target Name="Restore">
     <Exec Command="dotnet restore CommandLine-netcore.sln /p:Configuration=$(Configuration)" />
+    <Exec Command="dotnet restore tools/BuildTools.csproj /p:Configuration=$(Configuration)" />
   </Target>
 
   <Target Name="Build">
@@ -14,13 +15,17 @@
   </Target>
 
   <Target Name="Test">
-    <Exec Command="dotnet test CommandLine.Tests/CommandLine.Tests-netcore.csproj -l:trx /p:Configuration=$(Configuration)" />
+    <Exec Command="dotnet test CommandLine.Tests/CommandLine.Tests-netcore.csproj -l:trx /p:Configuration=$(Configuration)" Condition="'$(SkipTests)' != 'true'" />
   </Target>
 
   <Target Name="Pack">
     <Exec Command="dotnet pack CommandLine/CommandLine-netcore.csproj --no-build /p:Configuration=$(Configuration)" />
   </Target>
 
+  <Target Name="PushToBlobFeed">
+    <Exec Command="dotnet msbuild tools/BuildTools.csproj /t:PushToBlobFeed /p:Configuration=$(Configuration) /p:BlobFeedAccessToken=$(BlobFeedAccessToken) /p:ExpectedFeedUrl=$(ExpectedFeedUrl)" />
+  </Target>
+  
   <Target Name="MakeVersionProps">
     <MakeDir Condition="!Exists('obj')"
              Directories="obj" />

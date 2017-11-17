@@ -64,7 +64,7 @@ namespace Microsoft.DotNet.Cli.CommandLine.Tests
             ((Command) command["inner"]["inner-er"])
                 .HelpView()
                 .Should()
-                .Contain("Usage: outer inner inner-er [options]");
+                .StartWith("Usage: outer inner inner-er [options]");
         }
 
         [Fact]
@@ -95,38 +95,6 @@ namespace Microsoft.DotNet.Cli.CommandLine.Tests
            helpView
                 .Should()
                 .NotContain("Options:");
-        }
-
-        [Fact]
-        public void Parse_result_diagram_helps_explain_parse_operation()
-        {
-            var parser = new Parser(
-                Command("the-command",
-                        "Does the thing.",
-                        ZeroOrMoreArguments(),
-                        Option("-x", "Specifies value x", ExactlyOneArgument()),
-                        Option("-y", "Specifies value y", NoArguments())));
-
-            var result = parser.Parse("the-command -x one -y two three");
-
-            result.Diagram()
-                  .Should()
-                  .Be("[ the-command [ -x <one> ] [ -y ] <two> <three> ]");
-        }
-
-        [Fact]
-        public void Parse_result_diagram_helps_explain_partial_parse_operation()
-        {
-            var parser = new Parser(
-                Command("command", "",
-                        Option("-x", "",
-                               arguments: AnyOneOf("arg1", "arg2", "arg3"))));
-
-            var result = parser.Parse("command -x ar");
-
-            result.Diagram()
-                  .Should()
-                  .Be("[ command [ -x ] ]   ???--> ar");
         }
 
         [Fact]
@@ -164,7 +132,7 @@ namespace Microsoft.DotNet.Cli.CommandLine.Tests
 
             helpView
                 .Should()
-                .Contain("Usage: the-command [options] <the-args>");
+                .StartWith("Usage: the-command [options] <the-args>");
         }
 
         [Fact]
@@ -180,7 +148,7 @@ namespace Microsoft.DotNet.Cli.CommandLine.Tests
 
             helpView
                 .Should()
-                .Contain("Usage: outer-command <outer-args> inner-command [options] <inner-args>");
+                .StartWith("Usage: outer-command <outer-args> inner-command [options] <inner-args>");
         }
 
         [Fact]
@@ -301,7 +269,7 @@ namespace Microsoft.DotNet.Cli.CommandLine.Tests
 
             output.WriteLine(helpView);
 
-            helpView.Should().Contain("Usage: some-command [options] [[--] <additional arguments>...]]");
+            helpView.Should().StartWith("Usage: some-command [options] [[--] <additional arguments>...]]");
         }
 
         [Fact]

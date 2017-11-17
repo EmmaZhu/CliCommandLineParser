@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using static Microsoft.DotNet.Cli.CommandLine.ValidationMessages;
 
 namespace Microsoft.DotNet.Cli.CommandLine
 {
@@ -45,7 +46,7 @@ namespace Microsoft.DotNet.Cli.CommandLine
             {
                 var token = unparsedTokens.Dequeue();
 
-                if (token.Value == "--")
+                if (token.Type == TokenType.EndOfArguments)
                 {
                     // stop parsing further tokens
                     break;
@@ -63,12 +64,10 @@ namespace Microsoft.DotNet.Cli.CommandLine
 
                         if (appliedOption == null)
                         {
-                            appliedOption = new AppliedOption(definedOption, token.Value);
+                            appliedOption = new AppliedOption(
+                                definedOption,
+                                token.Value);
                             rootAppliedOptions.Add(appliedOption);
-                        }
-                        else
-                        {
-                            appliedOption.OptionWasRespecified();
                         }
 
                         allAppliedOptions.Add(appliedOption);
@@ -89,6 +88,12 @@ namespace Microsoft.DotNet.Cli.CommandLine
                         added = true;
                         break;
                     }
+
+                    if (token.Type == TokenType.Argument &&
+                        appliedOption.Option.IsCommand)
+                    {
+                        break;
+                    }
                 }
 
                 if (!added)
@@ -103,18 +108,33 @@ namespace Microsoft.DotNet.Cli.CommandLine
                     unmatchedTokens.Select(UnrecognizedArg));
             }
 
+            if (configuration.RootCommandIsImplicit)
+            {
+                rawArgs = rawArgs.Skip(1).ToArray();
+                var appliedOptions = rootAppliedOptions
+                    .SelectMany(o => o.AppliedOptions)
+                    .ToArray();
+                rootAppliedOptions = new AppliedOptionSet(appliedOptions);
+            }
+
             return new ParseResult(
                 rawArgs,
                 rootAppliedOptions,
                 isProgressive,
+                configuration,
                 unparsedTokens.Select(t => t.Value).ToArray(),
                 unmatchedTokens,
                 errors);
         }
-        
-        public IReadOnlyCollection<string> NormalizeRootCommand(IReadOnlyCollection<string> args)
+
+        internal IReadOnlyCollection<string> NormalizeRootCommand(IReadOnlyCollection<string> args)
         {
-            var firstArg = args.First();
+            if (configuration.RootCommandIsImplicit)
+            {
+                args = new[] { configuration.RootCommand.Name }.Concat(args).ToArray();
+            }
+
+            var firstArg = args.FirstOrDefault();
 
             if (DefinedOptions.Count != 1)
             {
@@ -126,12 +146,13 @@ namespace Microsoft.DotNet.Cli.CommandLine
                 ?.Name;
 
             if (commandName == null ||
-                firstArg.Equals(commandName, StringComparison.OrdinalIgnoreCase))
+                string.Equals(firstArg, commandName, StringComparison.OrdinalIgnoreCase))
             {
                 return args;
             }
 
-            if (firstArg.Contains(Path.DirectorySeparatorChar) &&
+            if (firstArg != null &&
+                firstArg.Contains(Path.DirectorySeparatorChar) &&
                 (firstArg.EndsWith(commandName, StringComparison.OrdinalIgnoreCase) ||
                  firstArg.EndsWith($"{commandName}.exe", StringComparison.OrdinalIgnoreCase)))
             {
@@ -146,7 +167,6 @@ namespace Microsoft.DotNet.Cli.CommandLine
         }
 
         private static OptionError UnrecognizedArg(string arg) =>
-            new OptionError(
-                $"Unrecognized command or argument '{arg}'", arg);
+            new OptionError(UnrecognizedCommandOrArgument(arg), arg);
     }
 }

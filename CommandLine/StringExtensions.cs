@@ -14,7 +14,7 @@ namespace Microsoft.DotNet.Cli.CommandLine
         private static readonly char[] optionPrefixCharacters = { '-' };
 
         private static readonly Regex tokenizer = new Regex(
-            @"(""(?<q>[^""]+)"")|(?<q>\S+)",
+            @"(""(?<q>[^""]*)"")|(?<q>\S+)",
             RegexOptions.Compiled | RegexOptions.ExplicitCapture
         );
 
@@ -56,6 +56,7 @@ namespace Microsoft.DotNet.Cli.CommandLine
             ParserConfiguration configuration)
         {
             Option currentCommand = null;
+            bool foundEndOfArguments = false;
 
             var argumentDelimiters = configuration.ArgumentDelimiters.ToArray();
 
@@ -63,6 +64,18 @@ namespace Microsoft.DotNet.Cli.CommandLine
 
             foreach (var arg in args)
             {
+                if (foundEndOfArguments)
+                {
+                    yield return Operand(arg);
+                    continue;
+                }
+                else if (arg == "--")
+                {
+                    yield return EndOfArguments();
+                    foundEndOfArguments = true;
+                    continue;
+                }
+
                 var argHasPrefix = HasPrefix(arg);
 
                 if (argHasPrefix && HasDelimiter(arg))
@@ -121,6 +134,10 @@ namespace Microsoft.DotNet.Cli.CommandLine
 
         private static Token Option(string value) => new Token(value, TokenType.Option);
 
+        private static Token EndOfArguments() => new Token("--", TokenType.EndOfArguments);
+
+        private static Token Operand(string value) => new Token(value, TokenType.Operand);
+
         private static bool CanBeUnbundled(
             this string arg,
             IReadOnlyCollection<Token> knownTokens) =>
@@ -137,6 +154,7 @@ namespace Microsoft.DotNet.Cli.CommandLine
             arg.Contains(":");
 
         private static bool HasPrefix(string arg) =>
+            arg != string.Empty &&
             optionPrefixCharacters.Contains(arg[0]);
 
         public static IEnumerable<string> Tokenize(this string s)
@@ -151,6 +169,9 @@ namespace Microsoft.DotNet.Cli.CommandLine
                 }
             }
         }
+
+        internal static string NotWhitespace(this string value) =>
+            string.IsNullOrWhiteSpace(value) ? null : value;
 
         private static HashSet<Token> ValidTokens(this Option option) =>
             new HashSet<Token>(

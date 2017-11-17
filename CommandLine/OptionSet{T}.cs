@@ -8,6 +8,7 @@ namespace Microsoft.DotNet.Cli.CommandLine
 {
     [DebuggerStepThrough]
     public abstract class OptionSet<T> : IReadOnlyCollection<T>
+        where T : class
     {
         private readonly HashSet<T> options = new HashSet<T>();
 
@@ -15,20 +16,22 @@ namespace Microsoft.DotNet.Cli.CommandLine
         {
         }
 
-        protected OptionSet(IReadOnlyCollection<Option> options)
+        protected OptionSet(IReadOnlyCollection<T> options)
         {
             if (options == null)
             {
                 throw new ArgumentNullException(nameof(options));
             }
 
-            foreach (var option in this.options)
+            foreach (var option in options)
             {
                 Add(option);
             }
         }
 
-        public T this[string alias] => options.Single(o => HasAlias(o, alias));
+        public T this[string alias] =>
+            options.SingleOrDefault(o => HasRawAlias(o, alias)) ??
+            options.Single(o => HasAlias(o, alias));
 
         public int Count => options.Count;
 
@@ -50,41 +53,28 @@ namespace Microsoft.DotNet.Cli.CommandLine
             }
         }
 
-        internal void TryAdd(T option)
-        {
-            if (!ContainsOptionWithAnyAliasOf(option))
-            {
-                options.Add(option);
-            }
-        }
+        protected abstract bool HasAlias(T option, string alias);
 
-        public abstract bool HasAlias(T option, string alias);
-
-        internal bool ContainsOptionWithAnyAliasOf(T option)
-        {
-            return AliasesFor(option)
-                .Any(alias => options
-                         .Any(o => HasAlias(o, alias)));
-        }
+        protected abstract bool HasRawAlias(T option, string alias);
 
         internal void Add(T option)
         {
-            foreach (var alias in AliasesFor(option))
+            var preexistingAlias = RawAliasesFor(option)
+                .FirstOrDefault(alias =>
+                                    options.Any(o =>
+                                                    HasRawAlias(o, alias)));
+
+            if (preexistingAlias != null)
             {
-                if (options.Any(o => HasAlias(o, alias)))
-                {
-                    throw new ArgumentException($"Alias '{alias}' is already in use.");
-                }
+                throw new ArgumentException($"Alias '{preexistingAlias}' is already in use.");
             }
 
             options.Add(option);
         }
 
-        protected abstract IReadOnlyCollection<string> AliasesFor(T option);
+        protected abstract IReadOnlyCollection<string> RawAliasesFor(T option);
 
-        public bool Contains(string alias)
-        {
-            return options.Any(option => HasAlias(option, alias));
-        }
+        public bool Contains(string alias) => 
+            options.Any(option => HasAlias(option, alias));
     }
 }

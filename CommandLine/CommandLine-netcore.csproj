@@ -5,7 +5,7 @@
     <RootNamespace>Microsoft.DotNet.Cli.CommandLine</RootNamespace>
     <AssemblyOriginatorKeyFile>windows.snk</AssemblyOriginatorKeyFile>
     <SignAssembly>true</SignAssembly>
-    <Version>0.1.0-alpha-$(CommitCount)</Version>
     <DelaySign>True</DelaySign>
+    <Version>0.1.1-alpha-$(CommitCount)</Version>
   </PropertyGroup>
 </Project>
